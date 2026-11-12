@@ -7,8 +7,10 @@ VRChatアバター改変用のUnityプロジェクトを、外出先のPCと自�
 
 ## 前提
 
-- 形: Unityエディタ拡張。`.unitypackage` で配布して `Assets/VrcGitSync/` に入れる（Package Manager の git URL でも入れられる）
-  - `Assets/VrcGitSync/` は自分のフォルダの外なので同期されない。使うPCごとにインポートする
+- 形: Unityエディタ拡張。パッケージ名は `io.github.octopusv.vrc-git-sync`
+  - VCC / ALCOM（VPM）で `Packages/io.github.octopusv.vrc-git-sync/` に入れる（v0.7.0〜）。入れたことは `Packages/vpm-manifest.json` に記録され、同期される
+  - `.unitypackage` で `Assets/VrcGitSync/` に入れることもできる。自分のフォルダの外なので同期されない。使うPCごとにインポートする
+  - Package Manager の git URL でも入れられる
 - 使う人: まず自分。gitに詳しくないVRChatユーザーにも配れる形にする
 - リモート: privateのGitHubリポジトリ（Git LFSを使用）
 - 1つのUnityプロジェクトに複数のアバターが入っている
@@ -90,6 +92,13 @@ VRChatアバター改変用のUnityプロジェクトを、外出先のPCと自�
     - 外すときは `git rm -r --cached` で記録から外す（このPCのファイルは残る。もう一方のPCでは受け取ると消える）。.meta は配布物と同じように同期し続ける
     - Assets 自体や、自分のフォルダを含むフォルダ、自分のフォルダの中のフォルダは追加できない
 
+11. VPM での配布（v0.7.0）
+    - パッケージ名を仮の `com.vrcgit.sync` から `io.github.octopusv.vrc-git-sync` に変えた（VPM の一覧を置く GitHub Pages のドメインに合わせた）
+    - `Tools~/build.py` が、`.unitypackage` に加えて、VPM 用の zip（package.json がルート）と一覧の `index.json` を作る。zip は Release に添付し、一覧は gh-pages ブランチ（GitHub Pages）に置く
+    - `.unitypackage` 版と VPM 版の両方が入ると、同じ名前のアセンブリが2つになり、どちらもコンパイルできなくなる（どちらのコードも動かないので、ツールの中では直せない）。そのため、二重になる前に片方を消す
+      - VCC / ALCOM で直接入れたとき: package.json の `legacyFolders` に `Assets/VrcGitSync` の GUID を書いておき、VCC / ALCOM に消してもらう
+      - もう一方のPCが切り替えた内容を受け取ったとき: `.unitypackage` 版（v0.7.0〜）が、`vpm-manifest.json` / `manifest.json` にこのツールが書かれたことに気づいて、自分のフォルダを消すか聞く（LegacyInstallCheck）。VPM の Resolve で実際に入るのは、その後に VCC / ALCOM からプロジェクトを開いたとき
+
 ## 後回しにしたもの
 
 - 衝突時にファイルごとにどちらを使うか選ぶ
@@ -104,3 +113,10 @@ VRChatアバター改変用のUnityプロジェクトを、外出先のPCと自�
 - 設定はプロジェクトごとに `ProjectSettings/VrcGitSync.json` に保存する（2台で共有される）
 - `.gitignore` と `.gitattributes` は、ツールが管理する区間だけを書き換える（手で書いた部分は残す）
 - VRChat SDKとの連携は別のアセンブリに分け、`com.vrchat.avatars` が入っているときだけコンパイルする
+
+## リリースの手順
+
+1. `package.json` の `version` を上げてコミットし、push する。タグ `v<version>` を付けて push する
+2. `git fetch origin gh-pages` のあとで `python Tools~/build.py` を実行する（gh-pages にある一覧に、今のバージョンが足される）
+3. GitHub に Release `v<version>` を作り、`Build~/` の `.unitypackage` と zip を添付する
+4. `Build~/pages/` の中身（`index.json`、`index.html`、`.nojekyll`）を gh-pages ブランチに置いて push する（Release の zip を添付してから。一覧の URL が zip を指すため）

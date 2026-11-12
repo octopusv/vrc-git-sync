@@ -1,29 +1,45 @@
 #!/usr/bin/env python3
-"""VRC Git Sync の .unitypackage を作る。
+"""VRC Git Sync の配布用ファイルを作る。
 
 使い方（リポジトリのルートで）:
-    python Tools~/build-unitypackage.py
+    python Tools~/build.py
 
 出力:
-    Build~/VrcGitSync-<package.json の version>.unitypackage
+    Build~/VrcGitSync-<version>.unitypackage      .unitypackage 版（Assets/VrcGitSync/ に入る）
+    Build~/<パッケージ名>-<version>.zip            VPM 版（VCC / ALCOM が Packages/<パッケージ名>/ に入れる）
+    Build~/pages/index.json, index.html            VPM のリポジトリ一覧（GitHub Pages の gh-pages ブランチに置く）
 
-インポートすると Assets/VrcGitSync/ に入る。
 GUID は各ファイルの .meta のものをそのまま使うので、何度作っても同じ GUID になる。
+.unitypackage と zip の中身は、何度作っても同じバイト列になる（ハッシュが変わらない）。
 Python の標準ライブラリだけで動く（Unity は不要）。
 
-UpdateInfo.txt も一緒に入れる。git の履歴にあって今のバージョンにはないファイル（削除・移動したもの）の GUID を書いておき、
+.unitypackage には UpdateInfo.txt も入れる。git の履歴にあって今のバージョンにはないファイル（削除・移動したもの）の GUID を書いておき、
 上書きでインポートしたときにツール（PackageUpdater）がそれを消す。
+
+index.json は、gh-pages ブランチにある今の一覧（git fetch しておく）に、今のバージョンを足して作る。
+zip の URL は GitHub の Release（タグ v<version>）を指すので、zip はその Release に添付する。
 """
 
+import hashlib
 import io
 import json
 import os
 import subprocess
 import sys
 import tarfile
+import zipfile
 import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# GitHub のリポジトリと、VPM の一覧を置く場所（GitHub Pages）
+GITHUB_REPO = "octopusv/vrc-git-sync"
+LISTING_URL = "https://octopusv.github.io/vrc-git-sync/index.json"
+LISTING_ID = "io.github.octopusv.vrc-git-sync"
+LISTING_NAME = "VRC Git Sync"
+LISTING_AUTHOR = "octopusv"
+PAGES_BRANCH = "gh-pages"
+# VPM 版の zip に入れるもの（.meta も一緒に入る）
+VPM_INCLUDE = ["package.json", "README.md", "LICENSE", "Editor"]
 INSTALL_DIR = "Assets/VrcGitSync"
 # Assets/VrcGitSync フォルダ自体の GUID（リポジトリのルートには .meta がないので固定値）
 INSTALL_DIR_GUID = "b79fe926f9604a58aba0dcc0d7ed51fa"
@@ -153,12 +169,7 @@ def add_bytes(tar, name, data):
     tar.addfile(info, io.BytesIO(data))
 
 
-def main():
-    with open(os.path.join(ROOT, "package.json"), encoding="utf-8") as f:
-        version = json.load(f)["version"]
-
-    out_dir = os.path.join(ROOT, "Build~")
-    os.makedirs(out_dir, exist_ok=True)
+def build_unitypackage(version, out_dir):
     out_path = os.path.join(out_dir, "VrcGitSync-{}.unitypackage".format(version))
 
     items = collect()
@@ -199,6 +210,105 @@ def main():
 
     print("作成しました: {}（{} 項目、古いバージョンから消すもの {} 個）".format(
         os.path.relpath(out_path, ROOT), len(items), removed_count))
+
+
+def vpm_files():
+    """VPM 版の zip に入れるファイル（リポジトリのルートからの相対パス、/ 区切り）。"""
+    files = []
+
+    def add(rel):
+        if not os.path.exists(os.path.join(ROOT, rel + ".meta")):
+            raise SystemExit(".meta がありません: " + rel)
+        files.append(rel + ".meta")
+        if os.path.isfile(os.path.join(ROOT, rel)):
+            files.append(rel)
+
+    for entry in VPM_INCLUDE:
+        add(entry)
+        top = os.path.join(ROOT, entry)
+        if not os.path.isdir(top):
+            continue
+        for dirpath, dirnames, filenames in os.walk(top):
+            dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and not d.endswith("~"))
+            for d in dirnames:
+                add(os.path.relpath(os.path.join(dirpath, d), ROOT).replace(os.sep, "/"))
+            for name in sorted(filenames):
+                if name.endswith(".meta") or name.startswith("."):
+                    continue
+                add(os.path.relpath(os.path.join(dirpath, name), ROOT).replace(os.sep, "/"))
+    return sorted(set(files))
+
+
+def build_vpm_zip(pkg, out_dir):
+    """package.json がルートにある zip を作り、(パス, SHA-256) を返す。"""
+    out_path = os.path.join(out_dir, "{}-{}.zip".format(pkg["name"], pkg["version"]))
+    files = vpm_files()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for rel in files:
+            info = zipfile.ZipInfo(rel, date_time=(2025, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            with open(os.path.join(ROOT, rel), "rb") as f:
+                z.writestr(info, f.read())
+    data = buf.getvalue()
+    with open(out_path, "wb") as f:
+        f.write(data)
+    sha = hashlib.sha256(data).hexdigest()
+    print("作成しました: {}（{} ファイル）".format(os.path.relpath(out_path, ROOT), len(files)))
+    return out_path, sha
+
+
+def current_listing():
+    """gh-pages ブランチにある今の index.json。なければ None。"""
+    for ref in ("origin/" + PAGES_BRANCH, PAGES_BRANCH):
+        r = subprocess.run(["git", "-C", ROOT, "show", ref + ":index.json"],
+                           capture_output=True, text=True, encoding="utf-8")
+        if r.returncode == 0:
+            return json.loads(r.stdout)
+    return None
+
+
+def build_pages(pkg, zip_path, sha, out_dir):
+    listing = current_listing()
+    if listing is None:
+        print("注意: {} ブランチに index.json がないので、新しく作ります。".format(PAGES_BRANCH))
+        listing = {}
+    listing.update({"name": LISTING_NAME, "id": LISTING_ID, "url": LISTING_URL, "author": LISTING_AUTHOR})
+    versions = listing.setdefault("packages", {}).setdefault(pkg["name"], {}).setdefault("versions", {})
+    entry = dict(pkg)
+    entry["url"] = "https://github.com/{}/releases/download/v{}/{}".format(
+        GITHUB_REPO, pkg["version"], os.path.basename(zip_path))
+    entry["zipSHA256"] = sha
+    old = versions.get(pkg["version"])
+    if old and old.get("zipSHA256") != sha:
+        print("注意: 一覧にある {} の zip とハッシュが違うので、置き換えます。".format(pkg["version"]))
+    versions[pkg["version"]] = entry
+
+    pages = os.path.join(out_dir, "pages")
+    os.makedirs(pages, exist_ok=True)
+    with open(os.path.join(pages, "index.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(listing, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    with open(os.path.join(ROOT, "Tools~", "pages", "index.html"), encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("{{LISTING_URL}}", LISTING_URL)
+    html = html.replace("{{GITHUB_URL}}", "https://github.com/" + GITHUB_REPO)
+    with open(os.path.join(pages, "index.html"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(html)
+    open(os.path.join(pages, ".nojekyll"), "w").close()
+    print("作成しました: {}（一覧にあるバージョン: {}）".format(
+        os.path.relpath(pages, ROOT), ", ".join(sorted(versions))))
+
+
+def main():
+    with open(os.path.join(ROOT, "package.json"), encoding="utf-8") as f:
+        pkg = json.load(f)
+    out_dir = os.path.join(ROOT, "Build~")
+    os.makedirs(out_dir, exist_ok=True)
+    build_unitypackage(pkg["version"], out_dir)
+    zip_path, sha = build_vpm_zip(pkg, out_dir)
+    build_pages(pkg, zip_path, sha, out_dir)
 
 
 if __name__ == "__main__":

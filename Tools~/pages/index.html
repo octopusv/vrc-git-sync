@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VRC Git Sync</title>
+<style>
+  :root { color-scheme: light dark; --fg: #1f2328; --bg: #ffffff; --sub: #59636e; --line: #d1d9e0; --accent: #0969da; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #e6edf3; --bg: #0d1117; --sub: #9198a1; --line: #3d444d; --accent: #4493f8; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif; line-height: 1.7; }
+  main { max-width: 640px; margin: 0 auto; padding: 48px 16px; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  p { margin: 12px 0; }
+  .sub { color: var(--sub); font-size: 14px; }
+  .add { display: inline-block; margin: 16px 0 8px; padding: 10px 20px; border-radius: 6px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; }
+  code { display: block; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; overflow-wrap: anywhere; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>VRC Git Sync</h1>
+  <p>VRChatアバター改変用のUnityプロジェクトを、GitHub経由で複数のPC間で同期するUnityエディタ拡張です。</p>
+
+  <a class="add" href="vcc://vpm/addRepo?url={{LISTING_URL}}">VCC / ALCOM に追加</a>
+
+  <p class="sub">ボタンで開かない場合は、VCC / ALCOM の設定にある「Packages」からリポジトリの追加を選び、次の URL を入力してください。</p>
+  <code>{{LISTING_URL}}</code>
+
+  <p>追加したあと、プロジェクトの管理画面で「VRC Git Sync」を追加してください。使い方や .unitypackage 版は <a href="{{GITHUB_URL}}">GitHub</a> にあります。</p>
+</main>
+</body>
+</html>

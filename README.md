@@ -31,7 +31,7 @@ Unityは、ファイル同士を GUID（`.meta` に書かれた ID）でつな�
 
 ### Mac で使う
 
-Windows と同じ `.unitypackage`・同じ GitHub リポジトリで、Windows と Mac の間でも同期できます。Mac では git まわりを Homebrew で入れます。
+Windows と同じパッケージ・同じ GitHub リポジトリで、Windows と Mac の間でも同期できます。Mac では git まわりを Homebrew で入れます。
 
 1. [Homebrew](https://brew.sh/) を入れて、ターミナルで次を実行します。
 
@@ -69,7 +69,27 @@ VPM パッケージは、Mac では ALCOM などで Windows と同じものを�
 
 ## インストール
 
-### .unitypackage で入れる（おすすめ）
+入れ方は「VCC / ALCOM」「.unitypackage」「Package Manager」の3つがあります。同じプロジェクトには、どれか1つの方法で入れてください（2つの方法で入れると、同じファイルが2つになってエラーになります）。
+
+### VCC / ALCOM で入れる（おすすめ）
+
+1. https://octopusv.github.io/vrc-git-sync/ を開いて「VCC / ALCOM に追加」を押します。
+   ボタンで開かない場合は、VCC / ALCOM の設定でリポジトリを追加し、`https://octopusv.github.io/vrc-git-sync/index.json` を入力します。
+2. VCC / ALCOM のプロジェクトの管理画面で「VRC Git Sync」を追加します。
+3. `Packages/io.github.octopusv.vrc-git-sync/` に入ります。
+
+- リポジトリの追加は、使うPCごとに一度だけ必要です。
+- このツールを入れたことは `Packages/vpm-manifest.json`（同期されます）に記録されます。もう一方のPCでは、受け取ったあとで VCC / ALCOM からプロジェクトを開くと、足りないパッケージとして入ります。
+- 更新は VCC / ALCOM から行います。もう一方のPCでも同じバージョンにそろえてください。
+
+**.unitypackage 版から移るとき**
+
+1. 片方のPCで、VCC / ALCOM から「VRC Git Sync」を追加します。`.unitypackage` で入れた `Assets/VrcGitSync/` は、VCC / ALCOM が自動で消します。そのあと「送る」を押します。
+2. もう一方のPCで「受け取る」を押すと、「このPCの .unitypackage 版を消しますか？」と聞かれるので、「消す」を押します。そのあと VCC / ALCOM からプロジェクトを開き直すと、VCC / ALCOM 版が入ります。
+
+もう一方のPCの `.unitypackage` 版が v0.6 以前の場合は、この確認が出ません。受け取る前に、そのPCでも VCC / ALCOM から追加しておいてください。
+
+### .unitypackage で入れる
 
 1. GitHub の Releases から `VrcGitSync-<バージョン>.unitypackage` をダウンロードします。
 2. Unity のメニュー **Assets → Import Package → Custom Package...** で選んで、すべてインポートします。
@@ -82,19 +102,17 @@ v0.5.0 以降は、古いバージョンにだけあったファイル（削除�
 そのような更新では、インポートの途中でコンソールに赤いエラーが一瞬出ることがあります。古いファイルを消したあとのコンパイルで自動的に消えるので、そのまま待ってください。
 （v0.4.1 以前から v0.5.0 への更新も、消えるファイルがないので上書きだけで大丈夫です）
 
-`.unitypackage` を自分で作る場合は、このリポジトリのルートで次を実行します（Python 3 が必要、Unity は不要）。
-`Build~/VrcGitSync-<バージョン>.unitypackage` ができます。
+配布用のファイルを自分で作る場合は、このリポジトリのルートで次を実行します（Python 3 が必要、Unity は不要）。
+`Build~/` に `.unitypackage`、VPM 用の zip、VPM のリポジトリ一覧（`pages/index.json`）ができます。
 
 ```bash
-python Tools~/build-unitypackage.py
+python Tools~/build.py
 ```
 
 ### Package Manager で入れる
 
-Unity の **Window → Package Manager → ＋ → Add package from git URL...** で、このリポジトリの URL を入力することもできます。
+Unity の **Window → Package Manager → ＋ → Add package from git URL...** で、このリポジトリの URL（`https://github.com/octopusv/vrc-git-sync.git`）を入力することもできます。
 この場合は `Packages/manifest.json`（同期されます）に記録されるので、2台目では自動で入ります。
-
-`.unitypackage` と Package Manager の両方で入れると、同じファイルが2つになってしまうので、どちらか一方にしてください。
 
 ## 使い方
 
@@ -114,7 +132,7 @@ Unity の **Window → Package Manager → ＋ → Add package from git URL...**
 **すでに同じプロジェクトがある場合（おすすめ）**
 
 1. 配布アセット（Boothの素体・衣装など）と VPM パッケージが、1台目と同じものが入っていることを確認します。
-2. このツールの `.unitypackage` をインポートして、**Tools → VRC Git Sync → 初期設定** の「GitHubから取り込む（2台目以降）」に、リポジトリの URL を入れて「取り込む」を押します。
+2. このツールを入れて（VCC / ALCOM か `.unitypackage`）、**Tools → VRC Git Sync → 初期設定** の「GitHubから取り込む（2台目以降）」に、リポジトリの URL を入れて「取り込む」を押します。
 3. 自分のフォルダ・ProjectSettings・パッケージの一覧が GitHub の内容で上書きされます。上書き前の内容は、プロジェクト内の `VrcGitSyncBackup/` にバックアップされます。
 4. 取り込み後は、Unity を一度再起動しておくと確実です。
 
@@ -126,8 +144,8 @@ Unity の **Window → Package Manager → ＋ → Add package from git URL...**
    git clone https://github.com/<ユーザー名>/<リポジトリ名>.git
    ```
 
-2. VCC / ALCOM で、clone したフォルダを既存のプロジェクトとして追加して開きます（VPM パッケージはここで入ります）。
-3. 1台目と同じ配布アセットと、このツールの `.unitypackage` をインポートしてから、自分のフォルダのシーンを開きます。
+2. VCC / ALCOM で、clone したフォルダを既存のプロジェクトとして追加して開きます（VPM パッケージはここで入ります。VCC / ALCOM で入れたこのツールも、ここで一緒に入ります）。
+3. 1台目と同じ配布アセット（`.unitypackage` 版を使っている場合は、このツールも）をインポートしてから、自分のフォルダのシーンを開きます。
 
 ### ふだんの使い方
 
@@ -223,11 +241,12 @@ FaceEmo の表情メニューのデータはシーンに保存されるので、
 | 大きいファイルを LFS に移したと出る | 50MB を超えるファイルは自動で Git LFS の対象になります（GitHub は 100MB を超えるファイルを受け付けないため） |
 | Unity のバージョンが違うと出る | 2台の Unity のバージョンをそろえてください |
 | 受け取ったのに表示がおかしい | 配布アセットや VPM パッケージのバージョンが2台で同じか確認してください |
+| `Assembly with name 'VrcGitSync.Editor' already exists` と出る | `.unitypackage` 版と VCC / ALCOM 版の両方が入っています。Unity を閉じて、エクスプローラー（Mac は Finder）でプロジェクトの `Assets/VrcGitSync` フォルダと `Assets/VrcGitSync.meta` を消してから、開き直してください |
 
 GitHub の Git LFS は、無料で保存容量 10GiB・転送量 月10GiB まで使えます（2026年11月時点）。
 配布アセットは送らないので、ふつうはこの範囲に収まります。
 
-## 今はできないこと（v0.6）
+## 今はできないこと（v0.7）
 
 - 衝突したファイルを1つずつ選ぶ（今は衝突したファイルをまとめてどちらかにそろえます）
 - 履歴の一覧や、過去のバージョンに戻す画面

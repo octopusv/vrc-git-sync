@@ -1122,7 +1122,18 @@ namespace VrcGitSync
             _blocking = false;
             Notify();
             if (!wasBlocking) _ = RefreshStatus(false);
+            try
+            {
+                OperationFinished?.Invoke();
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.LogException(e);
+            }
         }
+
+        /// <summary>送る・受け取る・初期設定などの処理が終わったとき（成功・失敗とも）。</summary>
+        public static event Action OperationFinished;
 
         static void ShowProgress(string text)
         {
