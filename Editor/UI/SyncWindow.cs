@@ -231,6 +231,28 @@ namespace VrcGitSync
                     GUIUtility.ExitGUI();
                 }
 
+                if (settings.vendorFolders.Count > 0)
+                {
+                    EditorGUILayout.Space(4);
+                    EditorGUILayout.LabelField(new GUIContent("配布物として扱うフォルダ",
+                        "外からファイルを入れたときに「配布物として扱う」を選んだフォルダです。中身は同期せず、ID（.meta）とインポート設定だけを同期します。" +
+                        "外すと、次にこのフォルダへ外からファイルを入れたときに、また聞きます。"), EditorStyles.miniBoldLabel);
+                    string removeVendor = null;
+                    foreach (var f in settings.vendorFolders)
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            EditorGUILayout.LabelField(f);
+                            if (GUILayout.Button("外す", GUILayout.Width(50))) removeVendor = f;
+                        }
+                    }
+                    if (removeVendor != null)
+                    {
+                        settings.vendorFolders.Remove(removeVendor);
+                        settings.Save();
+                    }
+                }
+
                 EditorGUILayout.Space(4);
                 EditorGUILayout.LabelField("GitHub のリポジトリ", EditorStyles.miniBoldLabel);
                 if (_newRemoteUrl == null) _newRemoteUrl = Git.RemoteUrl();
@@ -254,27 +276,29 @@ namespace VrcGitSync
         }
 
         /// <summary>選んだフォルダを、中身ごと同期するフォルダに追加する（確認つき）。右クリックメニューからも使う。</summary>
-        public static void AddExtraFolderInteractive(string folder)
+        /// <summary>確認してから、同期するフォルダに追加する。追加したら true。</summary>
+        public static bool AddExtraFolderInteractive(string folder)
         {
             var settings = SyncSettings.Current;
             var reason = settings.ValidateExtraFolder(folder);
             if (reason != null)
             {
                 EditorUtility.DisplayDialog(SyncOperations.Title, reason, "OK");
-                return;
+                return false;
             }
             long size = FolderSize(ProjectPaths.ToFull(folder));
             bool go = EditorUtility.DisplayDialog(SyncOperations.Title,
                 folder + " を、中身ごと同期するフォルダに追加します（今の大きさ: " + SyncOperations.FormatSize(size) + "）。\n\n" +
-                "ツールが決まった場所に書き出すフォルダ（FaceEmo の Generated など）に使ってください。\n" +
+                "ツールが決まった場所に書き出すフォルダ（FaceEmo の Generated など）や、自分で作ったファイルを置いたフォルダに使ってください。\n" +
                 "Booth の素体や衣装などの配布物のフォルダは追加しないでください（有料アセットが GitHub に上がってしまいます）。\n" +
                 (size > 200L * 1024 * 1024 ? "\n※大きいフォルダです。配布物が入っていないか確認してください。\n" : "") +
                 "\n次に「送る」を押したときに記録されます。",
                 "追加する", "やめる");
-            if (!go) return;
+            if (!go) return false;
             settings.AddExtraFolder(folder);
             RepoFiles.WriteAll(settings.ownFolder, settings.extraFolders);
             _ = SyncOperations.RefreshStatus(false);
+            return true;
         }
 
         static long FolderSize(string fullPath)

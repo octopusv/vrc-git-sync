@@ -39,6 +39,12 @@ namespace VrcGitSync
         /// </summary>
         public List<string> extraFolders = new List<string>();
 
+        /// <summary>
+        /// 外から入れたファイル（zip の素材など）について「配布物として扱う」を選んだフォルダ。
+        /// この中に外からファイルを入れても聞かない（中身は同期せず、.meta だけ同期する）。
+        /// </summary>
+        public List<string> vendorFolders = new List<string>();
+
         static SyncSettings _cached;
 
         public static string FullPath => ProjectPaths.ToFull(RelativePath);
@@ -131,6 +137,7 @@ namespace VrcGitSync
                     {
                         if (loaded.noWarnFolders == null) loaded.noWarnFolders = new List<string>();
                         if (loaded.extraFolders == null) loaded.extraFolders = new List<string>();
+                        if (loaded.vendorFolders == null) loaded.vendorFolders = new List<string>();
                         loaded.ownFolder = ProjectPaths.Normalize(loaded.ownFolder);
                         return loaded;
                     }
@@ -183,6 +190,27 @@ namespace VrcGitSync
                 if (string.Equals(f, folder, StringComparison.OrdinalIgnoreCase)) return;
             }
             noWarnFolders.Add(folder);
+            Save();
+        }
+
+        public bool IsVendorFolder(string assetPath)
+        {
+            foreach (var f in vendorFolders)
+            {
+                if (ProjectPaths.IsUnder(assetPath, f)) return true;
+            }
+            return false;
+        }
+
+        public void AddVendorFolder(string folder)
+        {
+            folder = ProjectPaths.Normalize(folder);
+            if (string.IsNullOrEmpty(folder) || folder == "Assets") return;
+            foreach (var f in vendorFolders)
+            {
+                if (string.Equals(f, folder, StringComparison.OrdinalIgnoreCase)) return;
+            }
+            vendorFolders.Add(folder);
             Save();
         }
     }

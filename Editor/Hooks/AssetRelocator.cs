@@ -300,14 +300,16 @@ namespace VrcGitSync
         }
 
         /// <summary>ファイルを自分のフォルダへ移動する（GUID は変わらないので参照は切れない）。</summary>
-        public static string MoveToOwnFolder(string path, out bool success)
+        /// <param name="relativeDest">自分のフォルダの中での置き場所（例: "TexSet/Body/a.png"）。省略するとファイル名だけで自分のフォルダの直下に置く。</param>
+        public static string MoveToOwnFolder(string path, out bool success, string relativeDest = null)
         {
             success = false;
             var settings = SyncSettings.Current;
             using (SaveWatcher.Suppress())
             {
-                ProjectPaths.EnsureAssetFolder(settings.ownFolder);
-                var dest = AssetDatabase.GenerateUniqueAssetPath(settings.ownFolder + "/" + Path.GetFileName(path));
+                var target = settings.ownFolder + "/" + (string.IsNullOrEmpty(relativeDest) ? Path.GetFileName(path) : relativeDest);
+                ProjectPaths.EnsureAssetFolder(Path.GetDirectoryName(target).Replace('\\', '/'));
+                var dest = AssetDatabase.GenerateUniqueAssetPath(target);
                 var err = AssetDatabase.MoveAsset(path, dest);
                 if (!string.IsNullOrEmpty(err)) return "移動できませんでした: " + err;
                 success = true;

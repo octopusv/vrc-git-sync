@@ -92,7 +92,7 @@ namespace VrcGitSync
                 if (SyncHooks.ExternalBuildRunning) return false;
                 if (_capture == null)
                 {
-                    if (Application.isBatchMode) return false;
+                    if (Application.isBatchMode && !ActiveInBatchMode) return false;
                     if (SyncOperations.Busy) return false;
                 }
                 var s = SyncSettings.Current;
@@ -116,20 +116,105 @@ namespace VrcGitSync
             return paths;
         }
 
+        // ---------------------------------------------------------------- 新しいファイル
+        //
+        // Unity の中で作られたファイル（作成メニュー、AssetDatabase.CreateAsset、シーンの別名保存、CopyAsset）は、
+        // 先にファイル自体のパスで OnWillCreateAsset が呼ばれ（まだファイルはない）、そのあと .meta のパスで呼ばれる。
+        // 外から入れたファイル（エクスプローラーでのコピー、ドラッグ＆ドロップ、zip の展開）は、
+        // ファイルがもうある状態で、.meta のパスでだけ呼ばれる。これで2つを見分ける。
+        // （ツールが画像などを直接書き出して読み込ませた場合も、外から入れたファイルと同じに見える）
+
+        /// <summary>このまとまり（1回の読み込み）の間に、Unity の中で作られたファイル。</summary>
+        static readonly HashSet<string> CreatedInUnity = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>このまとまりの間に新しくできたフォルダ（外から入れたフォルダのまとまりを見つけるため）。</summary>
+        static readonly HashSet<string> NewFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>自動テスト用: バッチモードでも警告の処理を動かす。</summary>
+        public static bool ActiveInBatchMode;
+
         static void OnWillCreateAsset(string path)
         {
             try
             {
                 if (!Active) return;
-                if (path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)) path = path.Substring(0, path.Length - 5);
+                path = ProjectPaths.Normalize(path);
+                bool metaCall = path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase);
+                if (metaCall) path = path.Substring(0, path.Length - 5);
+                var full = ProjectPaths.ToFull(path);
+
+                if (System.IO.Directory.Exists(full))
+                {
+                    NewFolders.Add(path);
+                    OutsideSaveWindow.ScheduleFlush();
+                    return;
+                }
                 // 拡張子のないものはフォルダとみなして無視する
                 if (string.IsNullOrEmpty(System.IO.Path.GetExtension(path))) return;
-                Consider(path, true);
+
+                if (!metaCall)
+                {
+                    CreatedInUnity.Add(path);
+                    OutsideSaveWindow.ScheduleFlush();
+                    Consider(path, true);
+                }
+                else if (CreatedInUnity.Contains(path))
+                {
+                    // ファイル自体のパスで受け付け済み
+                }
+                else if (System.IO.File.Exists(full))
+                {
+                    ConsiderImported(path);
+                }
+                else
+                {
+                    Consider(path, true);
+                }
             }
             catch (Exception e)
             {
                 Debug.LogException(e);
             }
+        }
+
+        /// <summary>外から入れたファイル。配布物か自分のファイルかを、フォルダごとにまとめて聞く。</summary>
+        static void ConsiderImported(string path)
+        {
+            if (!path.StartsWith("Assets/", StringComparison.Ordinal)) return;
+            // 同期の処理中（受け取りなど）に増えたファイルは対象にしない
+            if (_capture != null) return;
+            var s = SyncSettings.Current;
+            if (s.IsSynced(path) || s.IsNoWarn(path) || s.IsVendorFolder(path)) return;
+            if (OutsideSaveWindow.IsIgnoredThisSession(path)) return;
+            OutsideSaveWindow.Enqueue(path, OutsideSaveWindow.Kind.Imported);
+        }
+
+        /// <summary>
+        /// 外から入れたファイルをまとめるフォルダ。いっしょに新しくできたフォルダをたどって、いちばん上のものを返す
+        /// （例: zip を展開した "Assets/TexSet/Body/a.png" → "Assets/TexSet"）。既存のフォルダに入れた場合は、そのフォルダ。
+        /// </summary>
+        public static string ImportGroupFolder(string path)
+        {
+            var folder = ParentFolder(path);
+            while (folder != null && folder != "Assets" && NewFolders.Contains(folder))
+            {
+                var parent = ParentFolder(folder);
+                if (parent == null || parent == "Assets" || !NewFolders.Contains(parent)) break;
+                folder = parent;
+            }
+            return folder ?? "Assets";
+        }
+
+        public static string ParentFolder(string path)
+        {
+            var i = path.LastIndexOf('/');
+            return i > 0 ? path.Substring(0, i) : null;
+        }
+
+        /// <summary>1回の読み込みのまとまりが終わったとき（OutsideSaveWindow が呼ぶ）。</summary>
+        public static void EndBatch()
+        {
+            CreatedInUnity.Clear();
+            NewFolders.Clear();
         }
 
         static void Consider(string path, bool creating)
