@@ -1,0 +1,13 @@
+# OS / エディタ
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vs/
+.vscode/
+.idea/
+
+# .unitypackage のビルド結果
+/Build~/
+
+# Python
+__pycache__/
