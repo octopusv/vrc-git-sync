@@ -57,6 +57,32 @@
           },
           "url": "https://github.com/octopusv/vrc-git-sync/releases/download/v0.7.1/io.github.octopusv.vrc-git-sync-0.7.1.zip",
           "zipSHA256": "6c9d4621babc6944ad4575e209f47204c1a6ced959f2bbc389493bbda524fad3"
+        },
+        "0.7.2": {
+          "name": "io.github.octopusv.vrc-git-sync",
+          "displayName": "VRC Git Sync",
+          "version": "0.7.2",
+          "unity": "2022.3",
+          "description": "VRChatアバター改変プロジェクトの「自分のフォルダ」だけをGitHub経由で複数のPC間で同期するエディタ拡張です。",
+          "license": "MIT",
+          "author": {
+            "name": "octopusv",
+            "url": "https://github.com/octopusv"
+          },
+          "documentationUrl": "https://github.com/octopusv/vrc-git-sync#readme",
+          "changelogUrl": "https://github.com/octopusv/vrc-git-sync/releases",
+          "licensesUrl": "https://github.com/octopusv/vrc-git-sync/blob/main/LICENSE",
+          "keywords": [
+            "vrchat",
+            "git",
+            "sync"
+          ],
+          "vpmDependencies": {},
+          "legacyFolders": {
+            "Assets\\VrcGitSync": "b79fe926f9604a58aba0dcc0d7ed51fa"
+          },
+          "url": "https://github.com/octopusv/vrc-git-sync/releases/download/v0.7.2/io.github.octopusv.vrc-git-sync-0.7.2.zip",
+          "zipSHA256": "0a1790935bd852927919368469c5d84d16352985333a60e89717610fda2821ec"
         }
       }
     }
