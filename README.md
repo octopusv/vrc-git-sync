@@ -236,3 +236,7 @@ GitHub の Git LFS は、無料で保存容量 10GiB・転送量 月10GiB まで
 - 「コピーして使う」は、開いていないシーンで配布物のプレハブから引き継いでいる参照と、配布物のフォルダ内のファイル（配布物のプレハブなど）の中の参照は切り替えません
 
 設計の考え方は [Documentation~/design.md](Documentation~/design.md) にまとめています。
+
+## ライセンス
+
+[MIT License](LICENSE)

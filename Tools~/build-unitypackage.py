@@ -28,7 +28,7 @@ INSTALL_DIR = "Assets/VrcGitSync"
 # Assets/VrcGitSync フォルダ自体の GUID（リポジトリのルートには .meta がないので固定値）
 INSTALL_DIR_GUID = "b79fe926f9604a58aba0dcc0d7ed51fa"
 # パッケージに入れるもの（リポジトリのルートからの相対パス）
-INCLUDE = ["Editor", "README.md"]
+INCLUDE = ["Editor", "README.md", "LICENSE"]
 # tar 内の更新日時（何度作っても同じファイルになるように固定）
 MTIME = 1735689600  # 2025-01-01
 # UpdateInfo.txt の GUID（Editor/Hooks/PackageUpdater.cs の UpdateInfoGuid と同じ）

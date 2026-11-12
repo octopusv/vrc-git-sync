@@ -4,6 +4,7 @@
   "version": "0.6.0",
   "unity": "2022.3",
   "description": "VRChatアバター改変プロジェクトの「自分のフォルダ」だけをGitHub経由で複数のPC間で同期するエディタ拡張です。",
+  "license": "MIT",
   "keywords": [
     "vrchat",
     "git",
