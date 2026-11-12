@@ -658,7 +658,13 @@ namespace VrcGitSync
                     var merge = await MergeFromRemote();
                     if (merge == MergeResult.Failed) return false;
                     refresh = merge == MergeResult.Merged;
-                    Info(refresh ? "GitHubの変更を受け取りました。" : "新しい変更はありませんでした。");
+                    var info = refresh ? "GitHubの変更を受け取りました。" : "新しい変更はありませんでした。";
+                    var packages = await Bg(() => PackageCheck.Find(ProjectPaths.Root));
+                    if (packages.Count > 0)
+                    {
+                        info += "\nこのPCのパッケージが GitHub の記録と違います（" + packages.Count + " 個）。同期ウィンドウを見て、VCC / ALCOM でそろえてください。";
+                    }
+                    Info(info);
                     ok = true;
                     return true;
                 }
@@ -693,6 +699,7 @@ namespace VrcGitSync
             public GitResult? Error;
             public string ErrorTitle;
             public int ReplacedVendorMetas;
+            public List<string> RestoredMachineOnly;
         }
 
         class CommitOutcome
@@ -750,6 +757,10 @@ namespace VrcGitSync
             if (o.ReplacedVendorMetas > 0)
             {
                 AppendLog(o.ReplacedVendorMetas + " 個の配布物の ID を、もう一方のPCが記録した ID に置き換えました。");
+            }
+            if (o.RestoredMachineOnly != null && o.RestoredMachineOnly.Count > 0)
+            {
+                AppendLog("PC ごとの値だけが違っていたファイルを、受け取る前に元に戻しました: " + string.Join(", ", o.RestoredMachineOnly));
             }
             if (o.Error.HasValue)
             {
@@ -811,6 +822,8 @@ namespace VrcGitSync
             Git.AheadBehind(out _, out int behind, out _);
             if (behind == 0) return o;
 
+            // Unity が PC ごとに書き換える値だけが違うファイル（記録していない）は、取り込みの邪魔になるので先に戻す
+            o.RestoredMachineOnly = Git.RestoreMachineNoiseTouchedByIncoming();
             // もう一方のPCが記録した配布物の .meta と同じ場所に、このPCの未記録の .meta があると取り込めないので消す
             // （このPCの ID は GitHub の ID で置き換わる）
             o.ReplacedVendorMetas = Git.RemoveUntrackedIncomingVendorMetas(synced);

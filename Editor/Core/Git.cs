@@ -21,6 +21,10 @@ namespace VrcGitSync
         public int Behind;
         public bool HasUpstream;
         public bool HasRemote;
+        /// <summary>Unity が PC ごとに書き換える値だけが違うファイル（記録しない。MachineNoise）。</summary>
+        public int MachineOnlyChanges;
+        /// <summary>GitHub に記録されたバージョンと違うパッケージ。</summary>
+        public List<PackageCheck.Mismatch> PackageMismatches;
     }
 
     public struct UploadTag
@@ -257,11 +261,14 @@ namespace VrcGitSync
             s.Valid = true;
             s.Branch = CurrentBranch();
             var head = MetaIndex.HeadMap();
-            foreach (var e in StatusEntries())
+            var entries = StatusEntries();
+            var machineOnly = MachineNoiseOnlyChanges(entries);
+            s.MachineOnlyChanges = machineOnly.Count;
+            foreach (var e in entries)
             {
                 if (!MetaIndex.IsVendorMeta(e.Path, syncedFolders))
                 {
-                    s.ChangedFiles++;
+                    if (!machineOnly.Contains(e.Path)) s.ChangedFiles++;
                     continue;
                 }
                 // 配布物がこのPCにないので Unity が消した .meta は数えない（GitHub の方は消さない）
@@ -271,7 +278,51 @@ namespace VrcGitSync
             }
             s.HasRemote = !string.IsNullOrEmpty(RemoteUrl());
             AheadBehind(out s.Ahead, out s.Behind, out s.HasUpstream);
+            s.PackageMismatches = PackageCheck.Find(Root);
             return s;
+        }
+
+        // ---------------------------------------------------------------- PC ごとの値だけの違い
+
+        /// <summary>
+        /// path の HEAD との違いが、Unity が PC ごとに書き換える値だけか（MachineNoise）。
+        /// cached なら記録しようとしている内容を、そうでなければ今のファイルを比べる。
+        /// </summary>
+        public static bool IsMachineNoiseOnly(string path, bool cached)
+        {
+            if (!MachineNoise.MayHaveNoise(path)) return false;
+            var r = Run("--no-optional-locks --literal-pathspecs diff -U0 --no-color --no-ext-diff --no-textconv " +
+                        (cached ? "--cached " : "") + "HEAD -- " + Q(path), NetworkTimeout);
+            return r.Ok && MachineNoise.IsNoiseOnlyDiff(path, r.Output);
+        }
+
+        /// <summary>今のファイルが HEAD と PC ごとの値だけ違うもの。</summary>
+        public static HashSet<string> MachineNoiseOnlyChanges(IEnumerable<StatusEntry> entries)
+        {
+            var set = new HashSet<string>(StringComparer.Ordinal);
+            if (!HasCommits()) return set;
+            foreach (var e in entries)
+            {
+                bool modified = (e.X == 'M' || e.Y == 'M') && e.X != 'A' && e.X != 'D' && e.Y != 'D' && e.X != '?';
+                if (modified && MachineNoise.MayHaveNoise(e.Path) && IsMachineNoiseOnly(e.Path, false)) set.Add(e.Path);
+            }
+            return set;
+        }
+
+        /// <summary>
+        /// 取り込む前に、GitHub 側で変わったファイルのうち、このPCでは PC ごとの値だけが違っているものを HEAD の内容に戻す。
+        /// （記録していない違いが残っていると、git が取り込みを拒否する。値は Unity がまた書き込む）
+        /// </summary>
+        public static List<string> RestoreMachineNoiseTouchedByIncoming()
+        {
+            var restored = new List<string>();
+            var r = Run("diff --name-only -z HEAD...@{u}", NetworkTimeout);
+            if (!r.Ok) return restored;
+            var incoming = new HashSet<string>(r.Output.Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
+            if (incoming.Count == 0) return restored;
+            var targets = MachineNoiseOnlyChanges(StatusEntries().Where(e => incoming.Contains(e.Path))).ToList();
+            if (targets.Count > 0 && CheckoutFromHead(targets).Ok) restored.AddRange(targets);
+            return restored;
         }
 
         public static List<UploadTag> RecentUploads(int count)
@@ -331,6 +382,22 @@ namespace VrcGitSync
                 if (revert.Count > 0)
                 {
                     var rr = WithPathspecFile(revert, f => Run("--literal-pathspecs reset -q HEAD --pathspec-from-file=" + Q(f) + " --pathspec-file-nul", NetworkTimeout));
+                    if (!rr.Ok) return rr;
+                }
+            }
+
+            // Unity が PC ごとに書き換える値だけが違うファイルは記録しない
+            if (HasCommits())
+            {
+                var stagedAll = Run("diff --cached --name-only -z", NetworkTimeout);
+                var machineOnly = new List<string>();
+                foreach (var path in stagedAll.Output.Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (MachineNoise.MayHaveNoise(path) && IsMachineNoiseOnly(path, true)) machineOnly.Add(path);
+                }
+                if (machineOnly.Count > 0)
+                {
+                    var rr = WithPathspecFile(machineOnly, f => Run("--literal-pathspecs reset -q HEAD --pathspec-from-file=" + Q(f) + " --pathspec-file-nul", NetworkTimeout));
                     if (!rr.Ok) return rr;
                 }
             }

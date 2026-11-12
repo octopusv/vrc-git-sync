@@ -67,6 +67,12 @@ namespace VrcGitSync
                     EditorGUILayout.LabelField(new GUIContent("配布物の ID と設定", "新しく入れた配布物の .meta や、インポート設定の変更。「送る」で記録されます。"),
                         new GUIContent(status.VendorMetaChanges + " 個（「送る」で記録）"));
                 }
+                if (status.MachineOnlyChanges > 0)
+                {
+                    EditorGUILayout.LabelField(new GUIContent("PC ごとの値だけの違い",
+                            "シーンの環境光の色など、Unity が PC ごとに書き換える値だけが違うファイルです。同期しても意味がないので記録しません。"),
+                        new GUIContent(status.MachineOnlyChanges + " 個（記録しません）"));
+                }
                 EditorGUILayout.LabelField("まだ送っていない記録", status.Ahead + " 件");
                 string incoming;
                 if (!status.HasRemote) incoming = "GitHub が未登録です";
@@ -80,6 +86,19 @@ namespace VrcGitSync
                 if (GUILayout.Button("新着を確認", GUILayout.Width(100))) _ = SyncOperations.RefreshStatus(true);
             }
             if (!string.IsNullOrEmpty(SyncOperations.FetchError)) EditorGUILayout.HelpBox(SyncOperations.FetchError, MessageType.Warning);
+
+            if (status.Valid && status.PackageMismatches != null && status.PackageMismatches.Count > 0)
+            {
+                const int maxList = 6;
+                var lines = status.PackageMismatches.Take(maxList)
+                    .Select(m => "・" + m.Name + "（記録 " + m.Recorded + " / このPC " + (m.Installed ?? "入っていません") + "）");
+                EditorGUILayout.HelpBox(
+                    "このPCのパッケージが、GitHub の記録（もう一方のPC）と違います。VCC / ALCOM で同じバージョンにそろえてください。\n" +
+                    "違うままだと、シーンなどに書き込まれる内容がPCごとに変わって、何もしていなくても変更が出ることがあります。\n" +
+                    string.Join("\n", lines) +
+                    (status.PackageMismatches.Count > maxList ? "\n…ほか " + (status.PackageMismatches.Count - maxList) + " 個" : ""),
+                    MessageType.Warning);
+            }
 
             if (status.Valid && status.GuidMismatches > 0)
             {
